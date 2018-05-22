@@ -28,7 +28,7 @@ class BostonMedians(Dataset):
         super()
         d = sklearn.datasets.load_boston()
         self.X = pandas.DataFrame(d['data'], columns=d['feature_names'])
-        self.Y = pandas.DataFrame(d['target'], columns=['Target'])
+        self.Y = pandas.DataFrame(d['target'], columns=['Y'])
 
         # Booleanize feat by medians
         self.X = self.X - self.X.median(axis=0)
@@ -40,6 +40,8 @@ class BostonMedians(Dataset):
         self.Y[self.Y < 0] = 0
         self.Y[self.Y > 0] = 1
 
+        self.Y = self.Y.astype(int)
+        self.X = self.X.astype(int)
         # Simple correlation for edges       
         self.E = CorrelatedEdgeGenerator(self.X)
         return

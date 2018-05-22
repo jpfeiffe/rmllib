@@ -10,7 +10,7 @@ def CorrelatedEdgeGenerator(x, sparsity=95, noise=.1):
     :param sparsity: fraction of edge values = 0.  Multiply by 100 (np.percentile)
     :param noise: how much to pertub the edges
     '''
-    matrix = np.dot(x.as_matrix(), x.T.as_matrix())
+    matrix = np.dot(x.values, x.T.values)
     np.fill_diagonal(matrix, 0)
     matrix = matrix / matrix.max()
     matrix = matrix + rnd.normal(loc=0, scale=noise, size=matrix.shape)
