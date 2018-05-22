@@ -17,8 +17,7 @@ if __name__ == '__main__':
     # Seed numpy
     random.seed(ARGS.seed)
 
-    DATA = rmllib.Data.BostonMedians(subfeatures=['RM'])
-    # DATA = rmllib.Data.BostonMedians()
+    DATA = rmllib.Data.BostonMedians(subfeatures=['RM', 'AGE'])
     DATA.labelmask(labeled_frac=.3)
 
     # Train data
