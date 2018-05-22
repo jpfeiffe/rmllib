@@ -2,7 +2,7 @@ import numpy as np
 import numpy.random as rnd
 import pandas
 
-def CorrelatedEdgeGenerator(x, sparsity=95, noise=.1):
+def CorrelatedEdgeGenerator(x, sparsity=98, noise=.1):
     '''
     Builds randomized edges based on a feature matrix
 

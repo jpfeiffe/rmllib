@@ -3,6 +3,7 @@ import rmllib.Data
 import rmllib.Generators
 import rmllib.Learners
 import numpy.random as random
+import sklearn.metrics
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser()
@@ -17,4 +18,11 @@ if __name__ == '__main__':
     DATA = rmllib.Data.BostonMedians()
     DATA.labelmask()
 
-    rmllib.Learners.RNB().fit(DATA)
+    # Train data
+    RNB = rmllib.Learners.RNB().fit(DATA)
+
+    pred_iid = RNB.predict_proba(DATA, method='iid')
+    pred_riid = RNB.predict_proba(DATA, method='riid')
+
+    print(sklearn.metrics.roc_auc_score(DATA.Y.Y[~DATA.Mask.Mask], pred_iid))
+    print(sklearn.metrics.roc_auc_score(DATA.Y.Y[~DATA.Mask.Mask], pred_riid))
