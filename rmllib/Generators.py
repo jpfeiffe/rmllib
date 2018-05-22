@@ -3,7 +3,7 @@ import numpy.random as rnd
 import pandas
 
 
-def ManualEdgeGenerator(y, conditionals, sparsity=85, noise=.3):
+def ManualEdgeGenerator(y, conditionals, sparsity=90, noise=.3):
     y = y.copy()
     y[y.Y==0] = -1
     matrix = y.T.values * y.values

@@ -159,4 +159,4 @@ class EMWrapper:
         return self
 
     def predict(self, data):
-        return self.predictions
+        return self.basemodel.predict(data)
