@@ -58,7 +58,7 @@ class RNB:
             # Current Predictions     
             for i in range(self.inferenceiters):
                 Q = data.Y.copy()
-                Q[data.Mask.Unlabeled] = predictions
+                Q.loc[data.Mask.Unlabeled, :] = predictions.values.reshape(len(predictions),1)
 
                 rel = pandas.DataFrame(np.hstack((\
                                         np.dot(allToUnlabelE.values, Q.values),\
@@ -94,8 +94,6 @@ class RNB:
         log_posx = np.log(labeledY.join(labeledX).groupby('Y').mean())
         log_posx['X'] = 1
         log_posx = log_posx.reset_index().set_index(['Y', 'X'])
-        # print(log_posx)
-        # exit(0)
         log_negx = np.log(1-labeledY.join(labeledX).groupby('Y').mean())
         log_negx['X'] = 0
         log_negx = log_negx.reset_index().set_index(['Y', 'X'])
@@ -120,22 +118,45 @@ class RNB:
 
             self.feature_log_prob_ = self.feature_log_prob_.join(y)
 
+        elif self.learnmethod == 'r_uncertain':
+            labeledE = data.E.loc[data.Mask.Labeled, :]
+
+            # Create basic Y | Y_N conditionals
+            y = pandas.DataFrame(0, index=self.feature_log_prob_.index, columns=['Y_N'])
+
+            y.loc[(1,1), 'Y_N'] = np.dot(np.dot(labeledY.T.values, labeledE.values), data.Y.values)[0]
+            y.loc[(1,0), 'Y_N'] = np.dot(np.dot(labeledY.T.values, labeledE.values), 1-data.Y.values)[0]
+            y.loc[(0,1), 'Y_N'] = np.dot(np.dot(1-labeledY.T.values, labeledE.values), data.Y.values)[0]
+            y.loc[(0,0), 'Y_N'] = np.dot(np.dot(1-labeledY.T.values, labeledE.values), 1-data.Y.values)[0]
+
+            y['Total'] = y.groupby(level=0).transform('sum')
+            y['Y_N'] /= y['Total']
+            del y['Total']
+
+            y['Y_N'] = np.log(y['Y_N'])
+
+            self.feature_log_prob_ = self.feature_log_prob_.join(y)
+            
+
         return self
 
 
 class EMWrapper:
     def __init__(self, basemodel, emiters=10, **kwargs):
-        self.basemodel = basemodel(learnmethod='riid', infermethod='vi', **kwargs)
+        self.basemodel = basemodel(learnmethod='riid', **kwargs)
         self.emiters=emiters
 
     def fit(self, data):
         self.basemodel.fit(data)
+        self.basemodel.learnmethod = 'r_uncertain'
+        self.predictions = self.basemodel.predict(data)
 
         for i in range(self.emiters):
-            preds = self.basemodel.predict(data)
-            print(preds)
-            exit()
+            data.Y[data.Mask.Unlabeled] = self.predictions.values.reshape(len(self.predictions), 1)
+            self.basemodel.fit(data)
+            self.predictions = self.basemodel.predict(data)
+
         return self
 
     def predict(self, data):
-        return self.basemodel.predict(data)
+        return self.predictions

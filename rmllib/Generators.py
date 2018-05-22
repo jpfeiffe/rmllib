@@ -3,7 +3,7 @@ import numpy.random as rnd
 import pandas
 
 
-def ManualEdgeGenerator(y, conditionals, sparsity=90):
+def ManualEdgeGenerator(y, conditionals, sparsity=85, noise=.3):
     y = y.copy()
     y[y.Y==0] = -1
     matrix = y.T.values * y.values
@@ -11,7 +11,7 @@ def ManualEdgeGenerator(y, conditionals, sparsity=90):
     matrix = matrix.astype(float)
     matrix[matrix == 1] = conditionals[True]
     matrix[matrix == 0] = conditionals[False]
-    matrix += rnd.normal(scale=.5, size=matrix.shape)
+    matrix += rnd.normal(scale=noise, size=matrix.shape)
     matrix = np.minimum(matrix, matrix.T)
     np.fill_diagonal(matrix, 0)
     cutoffs = np.percentile(matrix, sparsity, axis=0)
