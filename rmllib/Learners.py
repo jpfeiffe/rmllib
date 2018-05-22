@@ -87,7 +87,6 @@ class RNB:
         # Only use the labeled data to fit
         labeledX = data.X.loc[data.Mask.Labeled, :]
         labeledY = data.Y.loc[data.Mask.Labeled, :]
-        labeledE = data.E.loc[data.Mask.Labeled, data.Mask.Labeled]
 
         self.class_log_prior_ = np.log([1-labeledY.Y.mean(), labeledY.Y.mean()])
 
@@ -104,6 +103,7 @@ class RNB:
         self.feature_log_prob_ = pandas.concat([log_posx,log_negx])
         
         if self.learnmethod == 'riid':
+            labeledE = data.E.loc[data.Mask.Labeled, data.Mask.Labeled]
             # Create basic Y | Y_N conditionals
             y = pandas.DataFrame(0, index=self.feature_log_prob_.index, columns=['Y_N'])
 
@@ -123,53 +123,19 @@ class RNB:
         return self
 
 
-class RNB_EM(RNB):
-    def __init__(self):
-        super().__init__()
+class EMWrapper:
+    def __init__(self, basemodel, emiters=10, **kwargs):
+        self.basemodel = basemodel(learnmethod='riid', infermethod='vi', **kwargs)
+        self.emiters=emiters
 
-    def fit(self, data, learnmethod='rem', inferencemethod='vi', learniters=10, inferenceiters=10):
-        assert(learnmethod == 'rem' and learniters > 0)
+    def fit(self, data):
+        self.basemodel.fit(data)
 
-        super().fit(data, learnmethod='riid')
-
-        print(self.feature_log_prob_)
-        exit()
-
-
-        # Only use the labeled data to fit
-        labeledX = data.X.loc[data.Mask.Mask, :]
-        labeledY = data.Y.loc[data.Mask.Mask, :]
-        labeledE = data.E.loc[data.Mask.Mask, data.Mask.Mask]
-
-        self.class_log_prior_ = np.log([1-labeledY.Y.mean(), labeledY.Y.mean()])
-
-        # Compute X log conditional values
-        log_posx = np.log(labeledY.join(labeledX).groupby('Y').mean())
-        log_posx['X'] = 1
-        log_posx = log_posx.reset_index().set_index(['Y', 'X'])
-        # print(log_posx)
-        # exit(0)
-        log_negx = np.log(1-labeledY.join(labeledX).groupby('Y').mean())
-        log_negx['X'] = 0
-        log_negx = log_negx.reset_index().set_index(['Y', 'X'])
-
-        self.feature_log_prob_ = pandas.concat([log_posx,log_negx])
-        
-        if method=='riid':
-            # Create basic Y | Y_N conditionals
-            y = pandas.DataFrame(0, index=self.feature_log_prob_.index, columns=['Y_N'])
-
-            y.loc[(1,1), 'Y_N'] = np.dot(np.dot(labeledY.T.values, labeledE.values), labeledY.values)[0]
-            y.loc[(1,0), 'Y_N'] = np.dot(np.dot(labeledY.T.values, labeledE.values), 1-labeledY.values)[0]
-            y.loc[(0,1), 'Y_N'] = np.dot(np.dot(1-labeledY.T.values, labeledE.values), labeledY.values)[0]
-            y.loc[(0,0), 'Y_N'] = np.dot(np.dot(1-labeledY.T.values, labeledE.values), 1-labeledY.values)[0]
-
-            y['Total'] = y.groupby(level=0).transform('sum')
-            y['Y_N'] /= y['Total']
-            del y['Total']
-
-            y['Y_N'] = np.log(y['Y_N'])
-
-            self.feature_log_prob_ = self.feature_log_prob_.join(y)
-
+        for i in range(self.emiters):
+            preds = self.basemodel.predict(data)
+            print(preds)
+            exit()
         return self
+
+    def predict(self, data):
+        return self.basemodel.predict(data)

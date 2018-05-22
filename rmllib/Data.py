@@ -2,6 +2,7 @@ import sklearn.datasets
 import numpy as np
 import numpy.random as rnd
 import pandas
+import copy
 from .Generators import ManualEdgeGenerator
 
 class Dataset():
@@ -12,6 +13,14 @@ class Dataset():
         self.Mask = None
         return
 
+    def copy(self):
+        return copy.deepcopy(self)
+
+    def createtraining(self):
+        train = self.copy()
+        train.Y[train.Mask.Unlabeled] = -1
+        return train
+        
     def labelmask(self, labeled_frac=.5):
         '''
         masks the labeled data to create an unlabeled set
@@ -20,6 +29,10 @@ class Dataset():
         '''
         self.Mask = pandas.DataFrame(rnd.random_sample(self.Y.shape) < labeled_frac, columns=['Labeled'])
         self.Mask['Unlabeled'] = ~self.Mask.Labeled
+
+    def applymask(self):
+        self.Y[self.Mask.Unlabeled] = -1
+        return
 
 class BostonMedians(Dataset):
     '''
@@ -54,3 +67,5 @@ class BostonMedians(Dataset):
         if subfeatures:
             self.X = self.X[subfeatures]
         return
+
+
