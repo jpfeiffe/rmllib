@@ -21,11 +21,13 @@ if __name__ == '__main__':
     DATA.labelmask(labeled_frac=.3)
 
     # Train data
-    RNB = rmllib.Learners.RNB().fit(DATA, learnmethod='riid')
+    RNB_IID = rmllib.Learners.RNB(learnmethod='iid', infermethod='iid', calibrate=True).fit(DATA)
+    RNB_RIID = rmllib.Learners.RNB(learnmethod='riid', infermethod='riid', calibrate=True).fit(DATA)
+    RNB_VI = rmllib.Learners.RNB(learnmethod='riid', infermethod='vi', calibrate=True, inferenceiters=10, unlabeled_confidence=1).fit(DATA)
 
-    P_IID = RNB.predict_proba(DATA, infermethod='iid')
-    P_RIID = RNB.predict_proba(DATA, infermethod='riid')
-    P_VI = RNB.predict_proba(DATA, infermethod='vi', iters=10, calibrate=True, unlabeled_confidence=1)
+    P_IID = RNB_IID.predict(DATA)
+    P_RIID = RNB_RIID.predict(DATA)
+    P_VI = RNB_VI.predict(DATA)
 
     print('IID Average Prediction:', P_IID.mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.Y.Y[DATA.Mask.Unlabeled], P_IID))
     print('RIID Average Prediction:', P_RIID.mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.Y.Y[DATA.Mask.Unlabeled], P_RIID))

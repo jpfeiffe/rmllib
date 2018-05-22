@@ -3,19 +3,17 @@ import numpy as np
 import scipy.special
 import scipy.stats
 
-class Learner():
-    def __init__(self):
-        return
-
-class RNB(Learner):
-    def __init__(self):
-        super().__init__()
+class RNB:
+    def __init__(self, learnmethod='iid', infermethod='vi', calibrate=True, inferenceiters=10, unlabeled_confidence=1):
         self.class_log_prior_ = None
         self.feature_log_prob_ = None
-    
-    def predict_proba(self, data, infermethod='vi', calibrate=True, iters=10, unlabeled_confidence=1):
-        assert(infermethod =='iid' or infermethod =='riid' or infermethod == 'vi')
+        self.learnmethod = learnmethod
+        self.infermethod = infermethod
+        self.inferenceiters = inferenceiters
+        self.unlabeled_confidence = unlabeled_confidence
+        self.calibrate = calibrate
 
+    def predict(self, data):
         unlabeledX = data.X.loc[data.Mask.Unlabeled, :].T
 
         # Other features taken care of...
@@ -26,11 +24,11 @@ class RNB(Learner):
         base_logpos = self.class_log_prior_[1] + logpos
 
         # Relational estimates
-        if infermethod == 'iid':
+        if self.infermethod == 'iid':
             neg = np.exp(base_logneg)
             pos = np.exp(base_logpos)
 
-        elif infermethod == 'riid' or infermethod == 'vi':
+        elif self.infermethod == 'riid' or self.infermethod == 'vi':
             labeledY = data.Y.loc[data.Mask.Labeled, :]
             labelToUnlabelE = data.E.loc[data.Mask.Unlabeled, data.Mask.Labeled]
             rel = pandas.DataFrame(\
@@ -46,19 +44,19 @@ class RNB(Learner):
             pos = np.exp(base_logpos + y_logpos)
 
         predictions = pos / (neg+pos)
-        if calibrate:
+        if self.calibrate:
             logits = scipy.special.logit(predictions)
             average = data.Y.loc[data.Mask.Labeled].mean()
             logits -= np.percentile(logits, average*100)
             predictions = scipy.special.expit(logits)
 
         # Joint inference
-        if infermethod == 'vi':
+        if self.infermethod == 'vi':
             ECopy = data.E.copy()
             allToUnlabelE = ECopy.loc[data.Mask.Unlabeled, :]
-            allToUnlabelE.loc[:, data.Mask.Unlabeled] *= unlabeled_confidence
+            allToUnlabelE.loc[:, data.Mask.Unlabeled] *= self.unlabeled_confidence
             # Current Predictions     
-            for i in range(iters):
+            for i in range(self.inferenceiters):
                 Q = data.Y.copy()
                 Q[data.Mask.Unlabeled] = predictions
 
@@ -76,7 +74,7 @@ class RNB(Learner):
                 pos = np.exp(base_logpos + y_logpos)
 
                 predictions = pos / (neg+pos)
-                if calibrate:
+                if self.calibrate:
                     logits = scipy.special.logit(predictions)
                     average = data.Y.loc[data.Mask.Labeled].mean()
                     logits -= np.percentile(logits, average*100)
@@ -85,9 +83,7 @@ class RNB(Learner):
         return predictions
 
 
-    def fit(self, data, learnmethod='iid'):
-        assert(learnmethod=='iid' or learnmethod=='riid')
-
+    def fit(self, data):
         # Only use the labeled data to fit
         labeledX = data.X.loc[data.Mask.Labeled, :]
         labeledY = data.Y.loc[data.Mask.Labeled, :]
@@ -107,7 +103,7 @@ class RNB(Learner):
 
         self.feature_log_prob_ = pandas.concat([log_posx,log_negx])
         
-        if learnmethod == 'riid':
+        if self.learnmethod == 'riid':
             # Create basic Y | Y_N conditionals
             y = pandas.DataFrame(0, index=self.feature_log_prob_.index, columns=['Y_N'])
 
@@ -131,10 +127,10 @@ class RNB_EM(RNB):
     def __init__(self):
         super().__init__()
 
-    def fit(self, data, method='em', iters=10):
-        assert(method=='em' and iters > 0)
+    def fit(self, data, learnmethod='rem', inferencemethod='vi', learniters=10, inferenceiters=10):
+        assert(learnmethod == 'rem' and learniters > 0)
 
-        super().fit(data, method='riid')
+        super().fit(data, learnmethod='riid')
 
         print(self.feature_log_prob_)
         exit()
