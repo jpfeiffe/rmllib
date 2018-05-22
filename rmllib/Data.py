@@ -2,7 +2,7 @@ import sklearn.datasets
 import numpy as np
 import numpy.random as rnd
 import pandas
-from .Generators import CorrelatedEdgeGenerator
+from .Generators import ManualEdgeGenerator
 
 class Dataset():
     def __init__(self):
@@ -18,13 +18,14 @@ class Dataset():
 
         :param frac: fraction of unlabeled dataset
         '''
-        self.Mask = pandas.DataFrame(rnd.random_sample(self.Y.shape) < labeled_frac, columns=['Mask'])
+        self.Mask = pandas.DataFrame(rnd.random_sample(self.Y.shape) < labeled_frac, columns=['Labeled'])
+        self.Mask['Unlabeled'] = ~self.Mask.Labeled
 
 class BostonMedians(Dataset):
     '''
     Simple boston dataset with randomized edge data
     '''
-    def __init__(self):
+    def __init__(self, subfeatures=None):
         super()
         d = sklearn.datasets.load_boston()
         self.X = pandas.DataFrame(d['data'], columns=d['feature_names'])
@@ -42,6 +43,14 @@ class BostonMedians(Dataset):
 
         self.Y = self.Y.astype(int)
         self.X = self.X.astype(int)
+
+        conditionals = {}
+        conditionals[True] = .51
+        conditionals[False] = .48
+
         # Simple correlation for edges       
-        self.E = CorrelatedEdgeGenerator(self.X)
+        self.E = ManualEdgeGenerator(self.Y, conditionals)
+
+        if subfeatures:
+            self.X = self.X[subfeatures]
         return

@@ -4,6 +4,8 @@ import rmllib.Generators
 import rmllib.Learners
 import numpy.random as random
 import sklearn.metrics
+import pandas
+pandas.options.mode.chained_assignment = None 
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser()
@@ -15,14 +17,21 @@ if __name__ == '__main__':
     # Seed numpy
     random.seed(ARGS.seed)
 
-    DATA = rmllib.Data.BostonMedians()
-    DATA.labelmask()
+    DATA = rmllib.Data.BostonMedians(subfeatures=['RM'])
+    # DATA = rmllib.Data.BostonMedians()
+    DATA.labelmask(labeled_frac=.3)
 
     # Train data
-    RNB = rmllib.Learners.RNB().fit(DATA)
+    RNB = rmllib.Learners.RNB().fit(DATA, learnmethod='riid')
 
-    pred_iid = RNB.predict_proba(DATA, method='iid')
-    pred_riid = RNB.predict_proba(DATA, method='riid')
+    P_IID = RNB.predict_proba(DATA, infermethod='iid')
+    P_RIID = RNB.predict_proba(DATA, infermethod='riid')
+    P_VI = RNB.predict_proba(DATA, infermethod='vi', iters=10, calibrate=True, unlabeled_confidence=1)
 
-    print(sklearn.metrics.roc_auc_score(DATA.Y.Y[~DATA.Mask.Mask], pred_iid))
-    print(sklearn.metrics.roc_auc_score(DATA.Y.Y[~DATA.Mask.Mask], pred_riid))
+    print('IID Average Prediction:', P_IID.mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.Y.Y[DATA.Mask.Unlabeled], P_IID))
+    print('RIID Average Prediction:', P_RIID.mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.Y.Y[DATA.Mask.Unlabeled], P_RIID))
+    print('VI Average Prediction:', P_VI.mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.Y.Y[DATA.Mask.Unlabeled], P_VI))
+
+
+    #RNB_EM = rmllib.Learners.RNB_EM().fit(DATA)
+    #print(RNB_EM.class_log_prior_)
