@@ -38,7 +38,3 @@ if __name__ == '__main__':
     print('RIID Average Prediction:', P_RIID[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_RIID[:, 1]))
     print('VI Average Prediction:', P_VI[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_VI[:, 1]))
     print('EM Average Prediction:', P_EM[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_EM[:, 1]))
-
-
-    #RNB_EM = rmllib.Learners.RNB_EM().fit(DATA)
-    #print(RNB_EM.class_log_prior_)
