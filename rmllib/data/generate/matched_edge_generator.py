@@ -1,14 +1,13 @@
 '''
-    Author: Joel Pfeiffer
-    Email: jpfeiffe@gmail.com
-    Date Created: 5/22/2018
-    Python Version: 3.6
+    Joel Pfeiffer
+    jpfeiffe@gmail.com
 '''
 import numpy as np
 import numpy.random as rnd
 import pandas
+from scipy.sparse import csr_matrix, bsr_matrix
 
-def matched_edge_generator(labels, mu_match=.55, mu_nomatch=.48, std=.3, sparsity=95, symmetric=True, remove_loops=True):
+def matched_edge_generator(labels, mu_match=.52, mu_nomatch=.48, std=.3, sparsity=95, symmetric=True, remove_loops=True, sparse=True, **kwargs):
     '''
     Generates a network given a set of labels.  If the labels are equal, samples from a normal
     with one std, and if they aren't equal it samples from another.  Sparsity sets the cutoff point.
@@ -43,5 +42,8 @@ def matched_edge_generator(labels, mu_match=.55, mu_nomatch=.48, std=.3, sparsit
     matrix[matrix >= cutoffs] = 1
     matrix[matrix < cutoffs] = 0
 
-    # Try and keep the sparse DF representation throughout
-    return pandas.DataFrame(matrix, index=labels.index)
+    if sparse:
+        matrix = csr_matrix(matrix.astype(np.int64))
+        return matrix
+
+    return matrix

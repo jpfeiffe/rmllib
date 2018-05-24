@@ -7,7 +7,7 @@
 import sklearn.datasets
 import pandas
 
-from .base import Dataset
+from ..base import Dataset
 from ..generate import matched_edge_generator
 
 class BostonMedians(Dataset):
@@ -24,7 +24,7 @@ class BostonMedians(Dataset):
         :subfeatures: Subsets of features available in the boston dataset.  Primarily for simulating weakened feature signals.
         :kwargs: Arguments for matched_edge_generator
         '''
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         boston = sklearn.datasets.load_boston()
         self.features = pandas.DataFrame(boston['data'], columns=boston['feature_names'])
         self.labels = pandas.DataFrame(boston['target'], columns=['Y'])

@@ -4,6 +4,8 @@ import numpy.random as random
 import sklearn.metrics
 
 from rmllib.data.load import BostonMedians
+from rmllib.data.generate import BayesSampleDataset
+from rmllib.data.generate import edge_rejection_generator
 from rmllib.models.local import RelationalNaiveBayes
 from rmllib.models.inference import VariationalInference
 from rmllib.models.inferning import ExpectationMaximization
@@ -19,22 +21,49 @@ if __name__ == '__main__':
     # Seed numpy
     random.seed(ARGS.seed)
 
-    DATA = BostonMedians(subfeatures=['RM', 'AGE'])
+    # DATA = BostonMedians(subfeatures=['RM', 'AGE'], sparse=True)
+    DATASETS = []
+    TRAIN_DATASETS = []
+    MODELS = []
 
-    TRAIN_DATA = DATA.create_training(labeled_frac=.1)
+    # DATASETS.append(BayesSampleDataset(name='Dense 100', n_rows=100, sparse=False))
+    # DATASETS.append(BayesSampleDataset(name='Sparse 100', n_rows=1000, sparse=True, generator=edge_rejection_generator))
+    DATASETS.append(BostonMedians(name='Boston Medians', subfeatures=['RM', 'AGE'], sparse=True))
 
-    # Train data
-    RNB_IID = RelationalNaiveBayes(learn_method='iid', infer_method='iid', calibrate=True).fit(TRAIN_DATA.copy())
-    RNB_RIID = RelationalNaiveBayes(learn_method='r_iid', infer_method='r_iid', calibrate=True).fit(TRAIN_DATA.copy())
-    RNB_VI = VariationalInference(RelationalNaiveBayes)(infer_iter=10, learn_method='r_iid', calibrate=True).fit(TRAIN_DATA.copy())
-    RNB_EM = ExpectationMaximization(VariationalInference(RelationalNaiveBayes))(learn_iter=3, infer_iter=10, calibrate=True).fit(TRAIN_DATA.copy())
+    # DATASETS.append(BayesSampleDataset(name='Dense 1000', n_rows=1000, sparse=False))
+    # DATASETS.append(BayesSampleDataset(name='Sparse 1000', n_rows=1000, sparse=True))
 
-    P_IID = RNB_IID.predict_proba(TRAIN_DATA)
-    P_RIID = RNB_RIID.predict_proba(TRAIN_DATA)
-    P_VI = RNB_VI.predict_proba(TRAIN_DATA)
-    P_EM = RNB_EM.predict_proba(TRAIN_DATA)
+    # # DATASETS.append(BayesSampleDataset(name='Dense 10000', n_rows=100000, sparse=False))
+    # DATASETS.append(BayesSampleDataset(name='Sparse 25000', n_rows=25000, sparse=True))
 
-    print('IID Average Prediction:', P_IID[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_IID[:, 1]))
-    print('RIID Average Prediction:', P_RIID[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_RIID[:, 1]))
-    print('VI Average Prediction:', P_VI[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_VI[:, 1]))
-    print('EM Average Prediction:', P_EM[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], P_EM[:, 1]))
+    MODELS.append(RelationalNaiveBayes(name='NB', learn_method='iid', infer_method='iid', calibrate=True))
+    MODELS.append(RelationalNaiveBayes(name='RNB', learn_method='r_iid', infer_method='r_iid', calibrate=True))
+
+    for dataset in DATASETS:
+        TRAIN_DATA = dataset.create_training(labeled_frac=.1)
+        
+        for model in MODELS:
+            train_data = TRAIN_DATA.copy()
+            model.fit(train_data)
+            model.predictions = model.predict_proba(train_data)
+            print(model.name, 'Average Prediction:', model.predictions[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(dataset.labels.Y[dataset.mask.Unlabeled], model.predictions[:, 1]))
+
+    exit()
+        
+
+    # print(DATA.labels)
+    # print(DATA.name)
+    # # DATA = BayesSampleDataset(name='Sparse 100', size=100, mu_match=.56, sparse=True)
+    # TRAIN_DATA = DATA.create_training(labeled_frac=.1)
+    # print(DATA.name)
+    # MODELS = []
+    # # MODELS.append(RelationalNaiveBayes(name='NB', learn_method='iid', infer_method='iid', calibrate=True))
+    # # MODELS.append(VariationalInference(RelationalNaiveBayes)(name='RNB VI', infer_iter=10, learn_method='r_iid', calibrate=True))
+    # # MODELS.append(ExpectationMaximization(VariationalInference(RelationalNaiveBayes))(name='RNB EM', learn_iter=3, infer_iter=10, calibrate=True))
+
+    # for model in MODELS:
+    #     train_data = TRAIN_DATA.copy()
+    #     model.fit(train_data)
+    #     model.predictions = model.predict_proba(train_data)
+
+    #     #print(model.name, 'Average Prediction:', model.predictions[:, 1].mean(), 'AUC:', sklearn.metrics.roc_auc_score(DATA.labels.Y[DATA.mask.Unlabeled], model.predictions[:, 1]))

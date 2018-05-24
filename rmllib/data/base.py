@@ -13,11 +13,12 @@ class Dataset:
     Basic functions every dataset should have.
     '''
     
-    def __init__(self, labels=None, features=None, edges=None, mask=None):
+    def __init__(self, name='dataset', labels=None, features=None, edges=None, mask=None, **kwargs):
         '''
         Each dataset is required to have features X, labels Y, edges E and a Mask that 
         corresponds to the labeled set
         '''
+        self.name = name
         self.labels = labels
         self.features = features
         self.edges = edges
