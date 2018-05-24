@@ -129,7 +129,6 @@ class RelationalNaiveBayes(LocalModel):
 
             neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
             neighbor_counts['Y_N'] /= neighbor_counts['Total']
-            print('R_IID:', neighbor_counts)
 
             self.feature_log_prob_ = self.feature_log_prob_.join(np.log(neighbor_counts['Y_N']))
 
