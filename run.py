@@ -3,7 +3,7 @@ import pandas
 import numpy.random as random
 import sklearn.metrics
 
-from rmllib.data.build import BostonMedians
+from rmllib.data.load import BostonMedians
 from rmllib.models.local import RelationalNaiveBayes
 from rmllib.models.inference import VariationalInference
 from rmllib.models.inferning import ExpectationMaximization
