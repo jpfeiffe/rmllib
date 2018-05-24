@@ -8,7 +8,7 @@ import pandas
 from scipy.sparse import csr_matrix
 import time
 
-def edge_rejection_generator(labels, negative_acception_probability=.5, std=.3, density=.05, remove_loops=True, sparse=True, **kwargs):
+def edge_rejection_generator(labels, negative_acception_probability=.1, density=.05, **kwargs):
     '''
     Generates a network given a set of labels.  If the labels are equal, samples from a normal
     with one std, and if they aren't equal it samples from another.  density sets the cutoff point.
@@ -46,7 +46,7 @@ def edge_rejection_generator(labels, negative_acception_probability=.5, std=.3, 
     proposed_edges = np.unique(np.vstack((proposed_edges, reversed_edges)), axis=0)
 
     # Create the sparse representation
-    matrix = csr_matrix((np.ones(len(proposed_edges)), (proposed_edges[:,0], proposed_edges[:,1]))     , shape=(len(labels), len(labels)), dtype=np.int32)
+    matrix = csr_matrix((np.ones(len(proposed_edges)), (proposed_edges[:,0], proposed_edges[:,1])), shape=(len(labels), len(labels)), dtype=np.int32)
     
     # Small correction hack
     zeroed = np.where(matrix.sum(axis=1)==0)[0]

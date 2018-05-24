@@ -17,23 +17,22 @@ def VariationalInference(local_model):
             super().__init__(**kwargs)
             self.infer_iter=infer_iter
 
-        def predict_proba(self, data):
+        def predict_proba(self, data, rel_update_only=False):
             '''
             Make predictions
 
             :param data: Network dataset to make predictions on
             '''
-        
-            self.set_infer_method('r_iid')
-            probabilities = super().predict_proba(data)
+            if not rel_update_only:
+                self.set_infer_method('r_iid')
+                self.probabilities = super().predict_proba(data)
             self.set_infer_method('r_joint')
 
             for _ in range(self.infer_iter):
                 time_start = time.time()
-                data.labels.Y.loc[data.mask.Unlabeled] = probabilities[:, 1]
-                probabilities = super().predict_proba(data, rel_update_only=True)
-                print(time.time() - time_start)
+                data.labels.Y.loc[data.mask.Unlabeled] = self.probabilities[:, 1]
+                self.probabilities = super().predict_proba(data, rel_update_only=True)
 
-            return probabilities
+            return self.probabilities
 
     return VariationalInference

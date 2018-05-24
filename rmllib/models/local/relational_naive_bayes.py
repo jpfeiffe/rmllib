@@ -120,7 +120,6 @@ class RelationalNaiveBayes(LocalModel):
         return np.argmax(self.predict_proba(data), axis=1)
 
     def fit(self, data, rel_update_only=False):
-        print(0)
         # Only use the labeled data to fit
         lab_features = data.features.loc[data.mask.Labeled, :]
         lab_labels = data.labels.loc[data.mask.Labeled, :]
@@ -159,7 +158,6 @@ class RelationalNaiveBayes(LocalModel):
             self.feature_log_prob_ = self.feature_log_prob_.join(np.log(neighbor_counts['Y_N']))
 
         elif self.learn_method == 'r_joint' or self.learn_method == 'r_twohop':
-            print('a')
             lab_to_all_edges = data.edges[data.mask.Labeled.nonzero()[0], :]
 
             # Create basic Y | Y_N counts
@@ -174,6 +172,5 @@ class RelationalNaiveBayes(LocalModel):
             neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
             neighbor_counts['Y_N'] /= neighbor_counts['Total']
             self.feature_log_prob_ = self.feature_log_prob_.join(np.log(neighbor_counts['Y_N']))
-            print('b')
             
         return self
