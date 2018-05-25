@@ -5,6 +5,7 @@ import pandas
 import numpy as np
 import scipy
 import time
+import itertools
 
 from .base import LocalModel
 
@@ -18,7 +19,8 @@ class RelationalNaiveBayes(LocalModel):
         '''
         super().__init__(**kwargs)
         self.class_log_prior_ = None
-        self.feature_log_prob_ = None
+        self.feature_log_prob_x_ = None
+        self.feature_log_prob_y_ = None
 
 
     def predict_proba(self, data, rel_update_only=False):
@@ -74,25 +76,6 @@ class RelationalNaiveBayes(LocalModel):
             base_logits += np.stack((y_logneg, y_logpos), axis=1)
             base_conditionals = np.exp(base_logits)
 
-
-
-            # rel = pandas.DataFrame(\
-            #                         ,\
-            #                         index=un_features.T.index, columns=['PosN', 'NegN']).rename_axis("X")
-
-            # y_logpos = rel['PosN']*self.feature_log_prob_['Y_N'].loc[(1, 1)]\
-            #                 + rel['NegN']*self.feature_log_prob_['Y_N'].loc[(1, 0)]
-            # y_logneg = rel['PosN']*self.feature_log_prob_['Y_N'].loc[(0, 1)]\
-            #                 + rel['NegN']*self.feature_log_prob_['Y_N'].loc[(0, 0)]
-
-            # base_logits += np.stack((y_logneg, y_logpos), axis=1)
-            # base_conditionals = np.exp(base_logits)
-            # if self.infer_method == 'r_twohop':
-            #     all_to_all_edges = data.edges.copy().div(data.edges.sum(axis=1), axis=0) * self.twohop_confidence
-            #     print(all_to_all_edges.sum(axis=1))
-            #     exit()
-                
-
         # Relational Joint Predictions
         confidence = base_conditionals.sum(axis=1)[:, np.newaxis]
         predictions = base_conditionals / confidence
@@ -138,11 +121,11 @@ class RelationalNaiveBayes(LocalModel):
             # Create basic Y | Y_N counts
             neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=['Y_N'])
 
-            neighbor_counts.loc[(1,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*data.labels.Y.values) * (data.labels.Y.values[data.mask.Labeled]))
-            neighbor_counts.loc[(1,0), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*(1-data.labels.Y.values)) * (data.labels.Y[data.mask.Labeled]))
-
-            neighbor_counts.loc[(0,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*data.labels.Y.values) * (1-data.labels.Y[data.mask.Labeled]))
-            neighbor_counts.loc[(0,0), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*(1-data.labels.Y.values)) * (1-data.labels.Y[data.mask.Labeled]))
+            unique_values = data.labels.Y[data.mask.Labeled].unique()
+            for neighbor_value in unique_values:
+                neighbor_product = lab_to_all_edges.dot(np.logical_and(data.mask.Labeled, data.labels.Y.values == neighbor_value))
+                for labeled_value in unique_values:
+                    neighbor_counts.loc[(labeled_value, neighbor_value), 'Y_N'] = np.sum(neighbor_product * (data.labels.Y.values[data.mask.Labeled] == labeled_value))
 
             neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
             neighbor_counts['Y_N'] /= neighbor_counts['Total']

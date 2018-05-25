@@ -7,6 +7,9 @@
 import copy
 import pandas
 import numpy.random as rnd
+import numpy as np
+
+
 
 class Dataset:
     '''
@@ -41,14 +44,16 @@ class Dataset:
                                      columns=['Labeled'])
         self.mask['Unlabeled'] = ~self.mask.Labeled
 
-        return
+        return self
 
-    def create_training(self, labeled_frac=.5):
+    def create_training(self, labeled_frac=None):
         '''
         Creates a training dataset by masking the unlabeled values to -1
         '''
-        if self.mask is None:
+        if labeled_frac:
             self.node_sample_mask(labeled_frac)
+        elif self.mask is None:
+            raise Exception("Labeled Mask not created")
 
         train = self.copy()
         train.labels.Y[train.mask.Unlabeled] = -1

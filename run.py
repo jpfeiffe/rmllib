@@ -25,17 +25,17 @@ if __name__ == '__main__':
     DATASETS = []
     MODELS = []
 
-    # DATASETS.append(BostonMedians(name='Boston Medians', subfeatures=['RM', 'AGE'], sparse=True))
-    DATASETS.append(BayesSampleDataset(name='Sparse 1,000,000', n_rows=1000000, n_features=3, generator=edge_rejection_generator, density=.000025, sparse=True))
+    DATASETS.append(BostonMedians(name='Boston Medians', subfeatures=['RM', 'AGE'], sparse=True).node_sample_mask(.1))
+    # DATASETS.append(BayesSampleDataset(name='Sparse 1,000,000', n_rows=1000000, n_features=3, generator=edge_rejection_generator, density=.000025, sparse=True).node_sample_mask(.01))
 
-    MODELS.append(RelationalNaiveBayes(name='NB', learn_method='iid', infer_method='iid', calibrate=True))
-    MODELS.append(RelationalNaiveBayes(name='RNB', learn_method='r_iid', infer_method='r_iid', calibrate=True))
+    # MODELS.append(RelationalNaiveBayes(name='NB', learn_method='iid', infer_method='iid', calibrate=True))
+    # MODELS.append(RelationalNaiveBayes(name='RNB', learn_method='r_iid', infer_method='r_iid', calibrate=True))
     MODELS.append(VariationalInference(RelationalNaiveBayes)(name='RNB_VI', learn_method='r_iid', infer_method='r_iid', calibrate=True))
-    MODELS.append(ExpectationMaximization(VariationalInference(RelationalNaiveBayes))(name='RNB_EM_VI', learn_method='r_iid', infer_method='r_iid', calibrate=True))
+    # MODELS.append(ExpectationMaximization(VariationalInference(RelationalNaiveBayes))(name='RNB_EM_VI', learn_method='r_iid', infer_method='r_iid', calibrate=True))
 
     print('Begin Evaluation')
     for dataset in DATASETS:
-        TRAIN_DATA = dataset.create_training(labeled_frac=.01)
+        TRAIN_DATA = dataset.create_training()
         
         for model in MODELS:
             print('\n' + model.name + ": Begin Train")
