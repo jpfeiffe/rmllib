@@ -6,7 +6,7 @@ from ..base import Dataset
 
 class BayesSampleDataset(Dataset):
 
-    def __init__(self, n_rows=100, n_features=1, positive_prior=.5, generator=matched_edge_generator, **kwargs):
+    def __init__(self, n_rows=100, n_features=2, positive_prior=.5, generator=matched_edge_generator, **kwargs):
         super().__init__(**kwargs)
         labels = rnd.random(n_rows) < positive_prior
         thresholds = rnd.random((2, n_features))

@@ -27,15 +27,13 @@ class RelationalNaiveBayes(LocalModel):
 
         :param data: Network dataset to make predictions on
         '''
-        un_features = data.features.loc[data.mask.Unlabeled, :].T
+        un_features = data.features.iloc[data.mask.Unlabeled.nonzero()[0], :].values
 
         if not rel_update_only:
-            # Other features taken care of...
-            logneg = (un_features.where(un_features != 0, self.feature_log_prob_.loc[0,:].T[0], axis=0)\
-                    + un_features.where(un_features != 1, self.feature_log_prob_.loc[0,:].T[1], axis=0)).T.sum(axis=1)
-            logpos = (un_features.where(un_features != 0, self.feature_log_prob_.loc[1,:].T[0], axis=0)\
-                    + un_features.where(un_features != 1, self.feature_log_prob_.loc[1,:].T[1], axis=0)).T.sum(axis=1)
-
+            logneg = (1-un_features).dot(self.feature_log_prob_x_.loc[(0,0),:].values)\
+                    + un_features.dot(self.feature_log_prob_x_.loc[(0,1),:].values)
+            logpos = (1-un_features).dot(self.feature_log_prob_x_.loc[(1,0),:].values)\
+                    + un_features.dot(self.feature_log_prob_x_.loc[(1,1),:].values)
             base_logits = np.stack((self.class_log_prior_[0] + logneg, self.class_log_prior_[1] + logpos), axis=1)
             self.base_logits = base_logits.copy()
 
@@ -53,12 +51,10 @@ class RelationalNaiveBayes(LocalModel):
             pos = self.unlabeled_confidence * all_to_unlabeled_edges.dot(data.mask.Labeled*data.labels.Y.values)
             neg = self.unlabeled_confidence * all_to_unlabeled_edges.dot(data.mask.Labeled*(1-data.labels.Y.values))
 
-            rel = pandas.DataFrame(np.stack((pos, neg)).T, index=un_features.T.index, columns=['PosN', 'NegN']).rename_axis("X")
-
-            y_logpos = rel['PosN']*self.feature_log_prob_['Y_N'].loc[(1, 1)]\
-                            + rel['NegN']*self.feature_log_prob_['Y_N'].loc[(1, 0)]
-            y_logneg = rel['PosN']*self.feature_log_prob_['Y_N'].loc[(0, 1)]\
-                            + rel['NegN']*self.feature_log_prob_['Y_N'].loc[(0, 0)]
+            y_logpos = self.feature_log_prob_y_.loc[(1,1)] * pos +\
+                        self.feature_log_prob_y_.loc[(1,0)] * neg
+            y_logneg = self.feature_log_prob_y_.loc[(0,1)] * pos +\
+                        self.feature_log_prob_y_.loc[(0,0)] * neg
 
             base_logits += np.stack((y_logneg, y_logpos), axis=1)
             base_conditionals = np.exp(base_logits)
@@ -68,14 +64,12 @@ class RelationalNaiveBayes(LocalModel):
             all_to_unlabeled_edges = data.edges[data.mask.Unlabeled.nonzero()[0], :]
 
             pos = self.unlabeled_confidence * all_to_unlabeled_edges.dot(data.labels.Y.values)
-            neg = self.unlabeled_confidence * all_to_unlabeled_edges.dot(1-data.labels.Y.values)
+            neg = self.unlabeled_confidence * all_to_unlabeled_edges.dot((1-data.labels.Y.values))
 
-            rel = pandas.DataFrame(np.stack((pos, neg)).T, index=un_features.T.index, columns=['PosN', 'NegN']).rename_axis("X")
-
-            y_logpos = rel['PosN']*self.feature_log_prob_['Y_N'].loc[(1, 1)]\
-                            + rel['NegN']*self.feature_log_prob_['Y_N'].loc[(1, 0)]
-            y_logneg = rel['PosN']*self.feature_log_prob_['Y_N'].loc[(0, 1)]\
-                            + rel['NegN']*self.feature_log_prob_['Y_N'].loc[(0, 0)]
+            y_logpos = self.feature_log_prob_y_.loc[(1,1)] * pos +\
+                        self.feature_log_prob_y_.loc[(1,0)] * neg
+            y_logneg = self.feature_log_prob_y_.loc[(0,1)] * pos +\
+                        self.feature_log_prob_y_.loc[(0,0)] * neg
 
             base_logits += np.stack((y_logneg, y_logpos), axis=1)
             base_conditionals = np.exp(base_logits)
@@ -121,8 +115,8 @@ class RelationalNaiveBayes(LocalModel):
 
     def fit(self, data, rel_update_only=False):
         # Only use the labeled data to fit
-        lab_features = data.features.loc[data.mask.Labeled, :]
-        lab_labels = data.labels.loc[data.mask.Labeled, :]
+        lab_features = data.features.iloc[data.mask.Labeled.nonzero()[0], :]
+        lab_labels = data.labels.iloc[data.mask.Labeled.nonzero()[0], :]
 
         # Prior distributions
         self.class_log_prior_ = np.log([1-lab_labels.Y.mean(), lab_labels.Y.mean()])
@@ -136,41 +130,38 @@ class RelationalNaiveBayes(LocalModel):
             log_negx['X'] = 0
             log_negx = log_negx.reset_index().set_index(['Y', 'X'])
 
-            self.feature_log_prob_ = pandas.concat([log_posx, log_negx])
-            self.feature_log_prob_x = self.feature_log_prob_.copy()
-        else:
-            self.feature_log_prob_ = self.feature_log_prob_x.copy()
+            self.feature_log_prob_x_ = pandas.concat([log_posx, log_negx])
 
         if self.learn_method == 'r_iid':
             lab_to_all_edges = data.edges[data.mask.Labeled.nonzero()[0], :]
 
             # Create basic Y | Y_N counts
-            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_.index, columns=['Y_N'])
+            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=['Y_N'])
 
             neighbor_counts.loc[(1,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*data.labels.Y.values) * (data.labels.Y.values[data.mask.Labeled]))
-            neighbor_counts.loc[(1,0), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*(1-data.labels.Y)) * (data.labels.Y[data.mask.Labeled]))
+            neighbor_counts.loc[(1,0), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*(1-data.labels.Y.values)) * (data.labels.Y[data.mask.Labeled]))
 
-            neighbor_counts.loc[(0,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*data.labels.Y) * (1-data.labels.Y[data.mask.Labeled]))
-            neighbor_counts.loc[(0,0), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*(1-data.labels.Y)) * (1-data.labels.Y[data.mask.Labeled]))
+            neighbor_counts.loc[(0,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*data.labels.Y.values) * (1-data.labels.Y[data.mask.Labeled]))
+            neighbor_counts.loc[(0,0), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.mask.Labeled*(1-data.labels.Y.values)) * (1-data.labels.Y[data.mask.Labeled]))
 
             neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
             neighbor_counts['Y_N'] /= neighbor_counts['Total']
-            self.feature_log_prob_ = self.feature_log_prob_.join(np.log(neighbor_counts['Y_N']))
+            self.feature_log_prob_y_ = np.log(neighbor_counts['Y_N'])
 
         elif self.learn_method == 'r_joint' or self.learn_method == 'r_twohop':
             lab_to_all_edges = data.edges[data.mask.Labeled.nonzero()[0], :]
 
             # Create basic Y | Y_N counts
-            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_.index, columns=['Y_N'])
+            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=['Y_N'])
 
             neighbor_counts.loc[(1,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.labels.Y.values) * (data.labels.Y.values[data.mask.Labeled]))
-            neighbor_counts.loc[(1,0), 'Y_N'] = np.sum(lab_to_all_edges.dot((1-data.labels.Y)) * (data.labels.Y[data.mask.Labeled]))
+            neighbor_counts.loc[(1,0), 'Y_N'] = np.sum(lab_to_all_edges.dot((1-data.labels.Y.values)) * (data.labels.Y[data.mask.Labeled]))
 
-            neighbor_counts.loc[(0,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.labels.Y) * (1-data.labels.Y[data.mask.Labeled]))
-            neighbor_counts.loc[(0,0), 'Y_N'] = np.sum(lab_to_all_edges.dot((1-data.labels.Y)) * (1-data.labels.Y[data.mask.Labeled]))
+            neighbor_counts.loc[(0,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.labels.Y.values) * (1-data.labels.Y[data.mask.Labeled]))
+            neighbor_counts.loc[(0,0), 'Y_N'] = np.sum(lab_to_all_edges.dot((1-data.labels.Y.values)) * (1-data.labels.Y[data.mask.Labeled]))
 
             neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
             neighbor_counts['Y_N'] /= neighbor_counts['Total']
-            self.feature_log_prob_ = self.feature_log_prob_.join(np.log(neighbor_counts['Y_N']))
+            self.feature_log_prob_y_ = np.log(neighbor_counts['Y_N'])
             
         return self
