@@ -3,6 +3,7 @@ import pandas
 
 from .matched_edge_generator import matched_edge_generator
 from ..base import Dataset
+from ..base import class_transform_to_dataframe
 
 class BayesSampleDataset(Dataset):
 
@@ -15,8 +16,8 @@ class BayesSampleDataset(Dataset):
         features[labels, :] = features[labels, :] < thresholds[1, :]
         features[~labels, :] = features[~labels, :] < thresholds[0, :]
 
-        self.labels = pandas.DataFrame(labels.astype(int), columns=['Y'])
-        self.features = pandas.DataFrame(features.astype(int), columns=list(map(lambda x: 'Feat_' + str(x), range(n_features))))
+        self.features = class_transform_to_dataframe(features.astype(int), islabel=False, sparse=True)
+        self.labels = class_transform_to_dataframe(labels.astype(int), islabel=True)
 
         # Simple correlation for edges       
         self.edges = generator(self.labels, **kwargs)

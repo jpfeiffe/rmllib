@@ -16,8 +16,7 @@ def ExpectationMaximization(local_model, **kwargs):
             self.set_learn_method('r_joint')
 
             for i in range(self.learn_iter):
-                probabilities = super().predict_proba(data, i != 0)
-                data.labels.Y.loc[data.mask.Unlabeled] = probabilities[:, 1]
+                super().predict_proba(data, i != 0)
                 super().fit(data, rel_update_only=True)
 
             return self

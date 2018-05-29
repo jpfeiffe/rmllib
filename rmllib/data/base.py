@@ -8,6 +8,48 @@ import copy
 import pandas
 import numpy.random as rnd
 import numpy as np
+import itertools
+from scipy.sparse import lil_matrix
+
+
+def class_transform_to_dataframe(init_mat, islabel=False, classes=None, sparse=False):
+    if islabel:
+        if len(init_mat.shape) == 1:
+            init_mat = init_mat[:, np.newaxis]
+        assert(init_mat.shape[1] == 1)
+        classes = ['Y']
+    elif classes is not None:
+        assert(len(classes) == init_mat.shape[1])
+    else:
+        classes = list(map(lambda x: 'Feature_' + str(x), range(init_mat.shape[1])))
+
+    classes = sorted(classes)
+    column_index = []
+
+    for i,class_name in enumerate(classes):
+        column_index += itertools.product([class_name], sorted(np.unique(init_mat[:, i])))
+
+    df = None
+
+    if not sparse:
+        # Construct dataframe
+        df = pandas.DataFrame(columns=pandas.MultiIndex.from_tuples(column_index))
+
+        for i,class_name in enumerate(classes):
+            for class_val in sorted(np.unique(init_mat[:, i])):
+                df.loc[:, (class_name, class_val)] = init_mat[:, i] == class_val
+    else:
+        mat = lil_matrix((init_mat.shape[0], len(column_index)))
+        ind = 0
+        for i,class_name in enumerate(classes):
+            for class_val in sorted(np.unique(init_mat[:, i])):
+                mat[:, ind] = (init_mat[:, i] == class_val)[:, np.newaxis]
+                ind += 1
+        df = pandas.SparseDataFrame(mat, columns=pandas.MultiIndex.from_tuples(column_index))
+
+    df = df.astype(float)
+
+    return df
 
 
 
@@ -28,6 +70,12 @@ class Dataset:
         self.mask = mask
         return
 
+    def is_sparse_features(self):
+        '''
+        checks whether the features are in a sparse representation
+        '''
+        return type(self.features) == pandas.SparseDataFrame
+
     def copy(self):
         '''
         Creates deep copy of the object (prevents datasets from interfering with each other)
@@ -40,7 +88,7 @@ class Dataset:
 
         :param frac: fraction of unlabeled dataset
         '''
-        self.mask = pandas.DataFrame(rnd.random_sample(self.labels.shape) < labeled_frac,\
+        self.mask = pandas.DataFrame(rnd.random_sample(len(self.labels)) < labeled_frac,\
                                      columns=['Labeled'])
         self.mask['Unlabeled'] = ~self.mask.Labeled
 
@@ -56,5 +104,5 @@ class Dataset:
             raise Exception("Labeled Mask not created")
 
         train = self.copy()
-        train.labels.Y[train.mask.Unlabeled] = -1
+        train.labels.Y[train.mask.Unlabeled] = np.nan
         return train

@@ -1,5 +1,6 @@
 import time
-
+import copy
+import numpy as np
 
 def VariationalInference(local_model):
     class VariationalInference(local_model):
@@ -28,9 +29,10 @@ def VariationalInference(local_model):
                 self.probabilities = super().predict_proba(data)
             self.set_infer_method('r_joint')
 
+            # probabilities = np.zeros()
+
             for _ in range(self.infer_iter):
-                time_start = time.time()
-                data.labels.Y.loc[data.mask.Unlabeled] = self.probabilities[:, 1]
+                data.labels.loc[data.mask.Unlabeled.nonzero()[0], 'Y'] = self.probabilities
                 self.probabilities = super().predict_proba(data, rel_update_only=True)
 
             return self.probabilities

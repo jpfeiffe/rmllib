@@ -6,8 +6,10 @@
 '''
 import sklearn.datasets
 import pandas
+import numpy as np
 
 from ..base import Dataset
+from ..base import class_transform_to_dataframe
 from ..generate import matched_edge_generator
 
 class BostonMedians(Dataset):
@@ -26,27 +28,28 @@ class BostonMedians(Dataset):
         '''
         super().__init__(**kwargs)
         boston = sklearn.datasets.load_boston()
-        self.features = pandas.DataFrame(boston['data'], columns=boston['feature_names'])
-        self.labels = pandas.DataFrame(boston['target'], columns=['Y'])
+        init_features = pandas.DataFrame(boston['data'], columns=boston['feature_names'])
+
+        if subfeatures:
+            init_features = init_features[subfeatures]
+
+        init_labels = pandas.DataFrame(boston['target'], columns=['Y'])
+        init_labels = init_labels - init_labels.median(axis=0)
+        init_labels.Y = np.where(init_labels.Y > 0, 1, 0).astype(int)
+
 
         # Booleanize feat by medians
-        self.features = self.features - self.features.median(axis=0)
-        self.features[self.features < 0] = 0
-        self.features[self.features > 0] = 1
+        init_features = init_features - init_features.median(axis=0)
+        init_features[init_features < 0] = 0
+        init_features[init_features > 0] = 1
+        init_features = init_features.astype(int)
 
-        # Booleanize target by medians
-        self.labels = self.labels - self.labels.median(axis=0)
-        self.labels[self.labels < 0] = 0
-        self.labels[self.labels > 0] = 1
-
-        self.labels = self.labels.astype(int)
-        self.features = self.features.astype(int)
+        # Create dataframe
+        self.labels = class_transform_to_dataframe(init_labels.Y.values, islabel=True)
+        self.features = class_transform_to_dataframe(init_features.values, islabel=False, classes=init_features.columns.values)
 
         # Simple correlation for edges       
         self.edges = matched_edge_generator(self.labels, **kwargs)
-
-        if subfeatures:
-            self.features = self.features[subfeatures]
 
         return
 

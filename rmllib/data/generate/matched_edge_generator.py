@@ -22,11 +22,10 @@ def matched_edge_generator(labels, mu_match=.52, mu_nomatch=.48, std=.3, sparsit
     '''
 
     # Build matrix of mu values
-    labels = labels.copy()
-    labels[labels.Y == 0] = -1
-    matrix = (labels.T.values * labels.values).astype(float)
-    matrix[matrix > 0] = mu_match
-    matrix[matrix < 0] = mu_nomatch
+    labels = labels.Y.copy()
+    matrix = labels.values.dot(labels.T.values).astype(float)
+    matrix[matrix > .5] = mu_match
+    matrix[matrix < .5] = mu_nomatch
 
     # Sample with given std
     matrix += rnd.normal(scale=std, size=matrix.shape)

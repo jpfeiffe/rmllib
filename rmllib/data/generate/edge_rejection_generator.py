@@ -8,7 +8,7 @@ import pandas
 from scipy.sparse import csr_matrix
 import time
 
-def edge_rejection_generator(labels, negative_acception_probability=.75, density=.05, **kwargs):
+def edge_rejection_generator(labels, negative_acception_probability=.9, density=.05, **kwargs):
     '''
     Generates a network given a set of labels.  If the labels are equal, samples from a normal
     with one std, and if they aren't equal it samples from another.  density sets the cutoff point.
@@ -22,7 +22,7 @@ def edge_rejection_generator(labels, negative_acception_probability=.75, density
     '''
 
     # Probability a proposed sample is rejected.
-    fraction_positive = labels.Y.mean()
+    fraction_positive = labels.Y[1].mean()
     probability_nomatch = 2*fraction_positive*(1-fraction_positive) / (fraction_positive*fraction_positive + (1-fraction_positive)*(1-fraction_positive) + 2*fraction_positive*(1-fraction_positive))
     rejection_probability = probability_nomatch * (1-negative_acception_probability)
 
@@ -34,7 +34,7 @@ def edge_rejection_generator(labels, negative_acception_probability=.75, density
     proposed_edges = rnd.randint(len(labels), size=(samples_needed,2))
 
     # Find the matched ones (always accept), then compute reject probabilities
-    matched = labels['Y'].values[proposed_edges[:, 0]] == labels['Y'].values[proposed_edges[:, 1]]
+    matched = labels.Y[1].values[proposed_edges[:, 0]] == labels.Y[1].values[proposed_edges[:, 1]]
     accept = rnd.random(len(proposed_edges)) < negative_acception_probability
 
     # These are the winners

@@ -13,11 +13,12 @@ class RelationalNaiveBayes(LocalModel):
     '''
     Basic RNB implementation.  Can do iid learning to collective inference.
     '''
-    def __init__(self, **kwargs):
+    def __init__(self, estimation_prior=.5, **kwargs):
         '''
         Sets up the NB specific parameters
         '''
         super().__init__(**kwargs)
+        self.estimation_prior = estimation_prior
         self.class_log_prior_ = None
         self.feature_log_prob_x_ = None
         self.feature_log_prob_y_ = None
@@ -29,60 +30,58 @@ class RelationalNaiveBayes(LocalModel):
 
         :param data: Network dataset to make predictions on
         '''
-        un_features = data.features.iloc[data.mask.Unlabeled.nonzero()[0], :].values
+        index = data.labels[data.mask.Unlabeled].index
 
         if not rel_update_only:
-            logneg = (1-un_features).dot(self.feature_log_prob_x_.loc[(0,0),:].values)\
-                    + un_features.dot(self.feature_log_prob_x_.loc[(0,1),:].values)
-            logpos = (1-un_features).dot(self.feature_log_prob_x_.loc[(1,0),:].values)\
-                    + un_features.dot(self.feature_log_prob_x_.loc[(1,1),:].values)
-            base_logits = np.stack((self.class_log_prior_[0] + logneg, self.class_log_prior_[1] + logpos), axis=1)
-            self.base_logits = base_logits.copy()
+            features = None
+            if not data.is_sparse_features():
+                features = data.features.values
+            else:
+                features = data.features.to_coo().tocsr()
 
+            un_features = features[data.mask.Unlabeled.values.nonzero()[0]]
+                
+            self.base_logits = pandas.DataFrame(un_features.dot(self.feature_log_prob_x_.values.T) + self.class_log_prior_.values, index=index)
+            base_logits = self.base_logits
         else:
             base_logits = self.base_logits.copy()
 
         # IID predictions
         if self.infer_method == 'iid':
-            base_conditionals = np.exp(base_logits)
+            base_conditionals = np.exp(self.base_logits.values)
 
         # Relational IID Predictions
         elif self.infer_method == 'r_iid':
             all_to_unlabeled_edges = data.edges[data.mask.Unlabeled.nonzero()[0], :]
 
-            pos = self.unlabeled_confidence * all_to_unlabeled_edges.dot(data.mask.Labeled*data.labels.Y.values)
-            neg = self.unlabeled_confidence * all_to_unlabeled_edges.dot(data.mask.Labeled*(1-data.labels.Y.values))
+            # Create basic Y | Y_N counts
+            neighbor_counts = pandas.DataFrame(index=base_logits.index, columns=self.feature_log_prob_x_.index)
 
-            y_logpos = self.feature_log_prob_y_.loc[(1,1)] * pos +\
-                        self.feature_log_prob_y_.loc[(1,0)] * neg
-            y_logneg = self.feature_log_prob_y_.loc[(0,1)] * pos +\
-                        self.feature_log_prob_y_.loc[(0,0)] * neg
+            for neighbor_value in data.labels.Y.columns:
+                neighbor_counts.loc[:, neighbor_value] = all_to_unlabeled_edges.dot(np.nan_to_num(data.mask.Labeled.values * data.labels.Y[neighbor_value].values))
 
-            base_logits += np.stack((y_logneg, y_logpos), axis=1)
-            base_conditionals = np.exp(base_logits)
+            base_logits += neighbor_counts.values.dot(self.feature_log_prob_y_.T.values)
+            base_conditionals = np.exp(base_logits.values)
 
         # Relational Join Predictions
         elif self.infer_method == 'r_joint' or self.infer_method == 'r_twohop':
             all_to_unlabeled_edges = data.edges[data.mask.Unlabeled.nonzero()[0], :]
 
-            pos = self.unlabeled_confidence * all_to_unlabeled_edges.dot(data.labels.Y.values)
-            neg = self.unlabeled_confidence * all_to_unlabeled_edges.dot((1-data.labels.Y.values))
+            # Create basic Y | Y_N counts
+            neighbor_counts = pandas.DataFrame(index=base_logits.index, columns=self.feature_log_prob_x_.index)
 
-            y_logpos = self.feature_log_prob_y_.loc[(1,1)] * pos +\
-                        self.feature_log_prob_y_.loc[(1,0)] * neg
-            y_logneg = self.feature_log_prob_y_.loc[(0,1)] * pos +\
-                        self.feature_log_prob_y_.loc[(0,0)] * neg
+            for neighbor_value in data.labels.Y.columns:
+                neighbor_counts.loc[:, neighbor_value] = all_to_unlabeled_edges.dot(data.labels.Y[neighbor_value].values)
 
-            base_logits += np.stack((y_logneg, y_logpos), axis=1)
-            base_conditionals = np.exp(base_logits)
+            base_logits += neighbor_counts.values.dot(self.feature_log_prob_y_.T.values)
+            base_conditionals = np.exp(base_logits.values)
 
         # Relational Joint Predictions
-        confidence = base_conditionals.sum(axis=1)[:, np.newaxis]
-        predictions = base_conditionals / confidence
+        predictions = base_conditionals / base_conditionals.sum(axis=1)[:, np.newaxis]
 
         if self.calibrate:
             logits = scipy.special.logit(predictions[:, 1])
-            logits -= np.percentile(logits, data.labels.loc[data.mask.Labeled].mean()*100)
+            logits -= np.percentile(logits, data.labels.Y[1].loc[data.mask.Labeled].mean()*100)
             predictions[:, 1] = scipy.special.expit(logits)
             predictions[:, 0] = 1 - predictions[:, 1]
 
@@ -97,54 +96,48 @@ class RelationalNaiveBayes(LocalModel):
         return np.argmax(self.predict_proba(data), axis=1)
 
     def fit(self, data, rel_update_only=False):
-        # Only use the labeled data to fit
-        lab_features = data.features.iloc[data.mask.Labeled.nonzero()[0], :]
-        lab_labels = data.labels.iloc[data.mask.Labeled.nonzero()[0], :]
-
-        # Prior distributions
-        self.class_log_prior_ = np.log([1-lab_labels.Y.mean(), lab_labels.Y.mean()])
-
         if not rel_update_only:
-            # Compute X log conditional values
-            log_posx = np.log(lab_labels.join(lab_features).groupby('Y').mean())
-            log_posx['X'] = 1
-            log_posx = log_posx.reset_index().set_index(['Y', 'X'])
-            log_negx = np.log(1-lab_labels.join(lab_features).groupby('Y').mean())
-            log_negx['X'] = 0
-            log_negx = log_negx.reset_index().set_index(['Y', 'X'])
+            self.class_log_prior_ = np.log(data.labels.Y[data.mask.Labeled].mean())
+            features = None
+            if not data.is_sparse_features():
+                features = data.features.values
+            else:
+                features = data.features.to_coo().tocsr()
 
-            self.feature_log_prob_x_ = pandas.concat([log_posx, log_negx])
+            self.feature_log_prob_x_ = pandas.DataFrame(columns=data.features.columns, dtype=np.float64)
+            for ycl in data.labels.Y.columns:
+                idx = np.nan_to_num(data.labels.Y[ycl].values * data.mask.Labeled.values).nonzero()[0]
+                self.feature_log_prob_x_.loc[ycl, :] = np.log(features[idx, :].mean(axis=0))
+
 
         if self.learn_method == 'r_iid':
             lab_to_all_edges = data.edges[data.mask.Labeled.nonzero()[0], :]
 
             # Create basic Y | Y_N counts
-            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=['Y_N'])
+            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=self.feature_log_prob_x_.index)
 
-            unique_values = data.labels.Y[data.mask.Labeled].unique()
-            for neighbor_value in unique_values:
-                neighbor_product = lab_to_all_edges.dot(np.logical_and(data.mask.Labeled, data.labels.Y.values == neighbor_value))
-                for labeled_value in unique_values:
-                    neighbor_counts.loc[(labeled_value, neighbor_value), 'Y_N'] = np.sum(neighbor_product * (data.labels.Y.values[data.mask.Labeled] == labeled_value))
+            for neighbor_value in data.labels.Y.columns:
+                neighbor_product = lab_to_all_edges.dot(np.nan_to_num(data.labels.Y[neighbor_value].values) * data.mask.Labeled)
 
-            neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
-            neighbor_counts['Y_N'] /= neighbor_counts['Total']
-            self.feature_log_prob_y_ = np.log(neighbor_counts['Y_N'])
+                for labeled_value in data.labels.Y.columns:
+                    neighbor_counts.loc[labeled_value, neighbor_value] = np.dot(neighbor_product, data.labels.Y[labeled_value][data.mask.Labeled])
+
+            neighbor_counts = neighbor_counts.div(neighbor_counts.sum(axis=1), axis=0)
+            self.feature_log_prob_y_ = np.log(neighbor_counts)
 
         elif self.learn_method == 'r_joint' or self.learn_method == 'r_twohop':
             lab_to_all_edges = data.edges[data.mask.Labeled.nonzero()[0], :]
 
             # Create basic Y | Y_N counts
-            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=['Y_N'])
+            neighbor_counts = pandas.DataFrame(0, index=self.feature_log_prob_x_.index, columns=self.feature_log_prob_x_.index)
 
-            neighbor_counts.loc[(1,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.labels.Y.values) * (data.labels.Y.values[data.mask.Labeled]))
-            neighbor_counts.loc[(1,0), 'Y_N'] = np.sum(lab_to_all_edges.dot((1-data.labels.Y.values)) * (data.labels.Y[data.mask.Labeled]))
+            for neighbor_value in data.labels.Y.columns:
+                neighbor_product = lab_to_all_edges.dot(data.labels.Y[neighbor_value].values)
 
-            neighbor_counts.loc[(0,1), 'Y_N'] = np.sum(lab_to_all_edges.dot(data.labels.Y.values) * (1-data.labels.Y[data.mask.Labeled]))
-            neighbor_counts.loc[(0,0), 'Y_N'] = np.sum(lab_to_all_edges.dot((1-data.labels.Y.values)) * (1-data.labels.Y[data.mask.Labeled]))
+                for labeled_value in data.labels.Y.columns:
+                    neighbor_counts.loc[labeled_value, neighbor_value] = np.sum(neighbor_product * data.labels.Y[labeled_value][data.mask.Labeled])
 
-            neighbor_counts['Total'] = neighbor_counts.groupby(level=0).transform('sum')
-            neighbor_counts['Y_N'] /= neighbor_counts['Total']
-            self.feature_log_prob_y_ = np.log(neighbor_counts['Y_N'])
+            neighbor_counts = neighbor_counts.div(neighbor_counts.sum(axis=1), axis=0)
+            self.feature_log_prob_y_ = np.log(neighbor_counts)
             
         return self
