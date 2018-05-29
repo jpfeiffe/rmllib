@@ -34,3 +34,5 @@ If you find the library useful for your work, please consider citing:
 >   howpublished = {\url{https://github.com/jpfeiffe/rmllib}},<br>
 >   note = {Accessed: 2010-09-30}<br>
 > }
+
+Additionally, please ensure to cite relevant articles for the corresponding methods, algorithms and/or datasets.
