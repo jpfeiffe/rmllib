@@ -19,6 +19,18 @@ For a simple example of building data and running methods, please see [the provi
 ## Installation
 Currently, installation is only from source, i.e.:
 
-> https://github.com/jpfeiffe/rmllib
-> cd rmllib
+> https://github.com/jpfeiffe/rmllib <br>
+> cd rmllib <br>
 > pip install rmllib
+
+## Blame
+Currently the project is maintained by me, Joel Pfeiffer, and until this project gets big feel free to [email me](mailto:jpfeiffe@gmail.com).  I'm always looking for help with new methods.  
+
+If you find the library useful for your work, please consider citing:
+
+> @misc{rmllib, <br>
+>   title = {Relational Machine Learning Library (RMLLib)},<br>
+>   author = {Joseph J. {Pfeiffer III}},<br>
+>   howpublished = {\url{https://github.com/jpfeiffe/rmllib}},<br>
+>   note = {Accessed: 2010-09-30}<br>
+> }
