@@ -19,7 +19,7 @@ For a simple example of building data and running methods, please see [the provi
 ## Installation
 Currently, installation is only from source, i.e.:
 
-> https://github.com/jpfeiffe/rmllib <br>
+> git clone https://github.com/jpfeiffe/rmllib <br>
 > cd rmllib <br>
 > pip install rmllib
 
