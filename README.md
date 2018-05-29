@@ -15,3 +15,10 @@ The crux of rmllib focuses on a [relational dependency network](http://www.jmlr.
 RMLLib uses APIs inspired by sklearn and relies heavily on numpy, scipy and pandas for data wrangling and optimizations, but generally these are not compatible learners for RMLLib.  This is largely due to the interconnectedness between labeled and unlabeled data.  The RMLLib dataformat largely hides this problem from the user by providing / using masking functions in the dataset to ensure the training labels remain unobserved during training.
 
 For a simple example of building data and running methods, please see [the provided notebook](docs/notebooks/GettingStarted.ipynb).
+
+## Installation
+Currently, installation is only from source, i.e.:
+
+> https://github.com/jpfeiffe/rmllib
+> cd rmllib
+> pip install rmllib
