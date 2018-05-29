@@ -7,9 +7,9 @@ import time
 from rmllib.data.load import BostonMedians
 from rmllib.data.generate import BayesSampleDataset
 from rmllib.data.generate import edge_rejection_generator
-from rmllib.models.local import RelationalNaiveBayes
-from rmllib.models.inference import VariationalInference
-from rmllib.models.inferning import ExpectationMaximization
+from rmllib.models.conditional import RelationalNaiveBayes
+from rmllib.models.collective_inference import VariationalInference
+from rmllib.models.semi_supervised import ExpectationMaximization
 
 pandas.options.mode.chained_assignment = None
 
@@ -25,8 +25,7 @@ if __name__ == '__main__':
     DATASETS = []
     MODELS = []
 
-    # DATASETS.append(BostonMedians(name='Boston Medians', subfeatures=['RM', 'AGE'], sparse=True).node_sample_mask(.1))
-    DATASETS.append(BayesSampleDataset(name='Sparse 1,000,000', n_rows=1000000, n_features=3, generator=edge_rejection_generator, density=.00002, sparse=False).node_sample_mask(.005))
+    DATASETS.append(BayesSampleDataset(name='Sparse 1,000,000', n_rows=1000000, n_features=3, generator=edge_rejection_generator, density=.00002, sparse=False).node_sample_mask(.01))
 
     MODELS.append(RelationalNaiveBayes(name='NB', learn_method='iid', infer_method='iid', calibrate=False))
     MODELS.append(RelationalNaiveBayes(name='RNB', learn_method='r_iid', infer_method='r_iid', calibrate=False))
